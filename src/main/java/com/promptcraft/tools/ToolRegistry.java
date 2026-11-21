@@ -122,7 +122,7 @@ public class ToolRegistry {
 
         JsonArray cmds = args.getAsJsonArray("commands");
         List<String> results = new ArrayList<>();
-        CommandSourceStack source = player.createCommandSourceStack().withPermission(4); // Run with elevated permissions
+        boolean anyError = false;
 
         boolean safeMode = PromptCraftConfig.get().safeMode;
         List<String> forbidden = List.of("stop", "ban", "ban-ip", "pardon", "op", "deop", "whitelist");
@@ -133,19 +133,63 @@ public class ToolRegistry {
 
             String baseCmd = cmd.split(" ")[0].toLowerCase();
             if (safeMode && forbidden.contains(baseCmd)) {
-                results.add("Blocked dangerous command in Safe Mode: " + cmd);
+                results.add("Blocked dangerous command in Safe Mode: /" + cmd);
                 continue;
             }
 
+            CommandCaptureSource capture = new CommandCaptureSource();
+            boolean[] successHolder = new boolean[]{true};
+
+            CommandSourceStack source = player.createCommandSourceStack()
+                    .withPermission(4) // Run with elevated permissions
+                    .withSource(capture) // Intercept failure and success output silently
+                    .withCallback((success, result) -> successHolder[0] = success);
+
             try {
                 player.server.getCommands().performPrefixedCommand(source, cmd);
-                results.add("Successfully executed: /" + cmd);
+
+                String engineOutput = String.join("; ", capture.messages);
+                if (!successHolder[0]) {
+                    anyError = true;
+                    results.add(String.format("FAILED: /%s -> Game error: '%s'. Please fix syntax/arguments/block ID and retry.", cmd, engineOutput.isEmpty() ? "Unknown command failure" : engineOutput));
+                } else {
+                    results.add(String.format("SUCCESS: /%s%s", cmd, engineOutput.isEmpty() ? "" : " (" + engineOutput + ")"));
+                }
             } catch (Exception e) {
-                results.add("Failed executing /" + cmd + ": " + e.getMessage());
+                anyError = true;
+                results.add(String.format("EXCEPTION: /%s -> Error: %s", cmd, e.getMessage()));
             }
         }
 
+        if (anyError) {
+            player.sendSystemMessage(Component.literal("§e[PromptCraft] §7检测到指令异常，正在自动捕获报错并交由 AI 现场重写纠错..."));
+        }
+
         return String.join("\n", results);
+    }
+
+    public static class CommandCaptureSource implements net.minecraft.commands.CommandSource {
+        public final List<String> messages = new ArrayList<>();
+
+        @Override
+        public void sendSystemMessage(Component message) {
+            messages.add(message.getString());
+        }
+
+        @Override
+        public boolean acceptsSuccess() {
+            return true;
+        }
+
+        @Override
+        public boolean acceptsFailure() {
+            return true;
+        }
+
+        @Override
+        public boolean shouldInformAdmins() {
+            return false;
+        }
     }
 
     private static String createDynamicWeapon(ServerPlayer player, JsonObject args) {

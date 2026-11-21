@@ -52,8 +52,8 @@ public class LLMClient {
                 userMsg.addProperty("content", userPrompt);
                 messages.add(userMsg);
 
-                // Start tool loop (max 4 turns to avoid infinite loops)
-                int maxTurns = 4;
+                // Start tool loop (max 6 turns to allow self-correction and retries)
+                int maxTurns = 6;
                 for (int turn = 0; turn < maxTurns; turn++) {
                     JsonObject requestBody = new JsonObject();
                     requestBody.addProperty("model", config.model);
@@ -162,6 +162,11 @@ public class LLMClient {
             - When asked to "play a zombie siege game" or "start a minigame", call `create_minigame` to start the game with a BossBar and waves.
             - When asked to interact with other mods, call `inspect_mods` to discover available mod items and blocks.
             - Answer in the same language as the player (e.g., Chinese if asked in Chinese). Keep your final text concise and exciting!
+
+            Automatic Error Self-Correction:
+            - If `execute_commands` returns a failure report (e.g. "FAILED: /fill ... -> Game error: 'Unknown block type...'"), DO NOT give up or send an apology text!
+            - Immediately analyze the Game error message, fix the command syntax or block/entity ID, and call `execute_commands` again.
+            - The game silently intercepts errors so the player's chat is NOT spammed with red text while you correct yourself.
             """;
 
         String filled = String.format(base,
