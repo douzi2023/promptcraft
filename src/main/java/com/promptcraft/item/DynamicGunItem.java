@@ -12,11 +12,15 @@ import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.entity.projectile.DragonFireball;
 import net.minecraft.world.entity.projectile.LargeFireball;
 import net.minecraft.world.entity.projectile.SmallFireball;
 import net.minecraft.world.entity.projectile.Snowball;
+import net.minecraft.world.entity.projectile.WitherSkull;
+import net.minecraft.world.entity.projectile.windcharge.WindCharge;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
@@ -67,6 +71,34 @@ public class DynamicGunItem extends Item {
             Vec3 lookVec = player.getLookAngle();
 
             switch (projectileType.toLowerCase()) {
+                case "tnt", "primed_tnt" -> {
+                    PrimedTnt tnt = new PrimedTnt(serverLevel, eyePos.x + lookVec.x * 1.5, eyePos.y + lookVec.y * 1.5, eyePos.z + lookVec.z * 1.5, player);
+                    tnt.setDeltaMovement(lookVec.scale(speed > 0 ? speed * 0.6 : 1.4));
+                    int fuse = tag.contains("fuse") ? tag.getInt("fuse") : 40; // 2 seconds fuse
+                    tnt.setFuse(fuse);
+                    serverLevel.addFreshEntity(tnt);
+                    level.playSound(null, player.getX(), player.getY(), player.getZ(),
+                            SoundEvents.TNT_PRIMED, SoundSource.PLAYERS, 1.0f, 1.0f);
+                }
+                case "wind_charge" -> {
+                    WindCharge windCharge = new WindCharge(player, serverLevel, eyePos.x + lookVec.x * 1.2, eyePos.y + lookVec.y * 1.2, eyePos.z + lookVec.z * 1.2);
+                    windCharge.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0f, speed * 1.5f, 1.0f);
+                    serverLevel.addFreshEntity(windCharge);
+                    level.playSound(null, player.getX(), player.getY(), player.getZ(),
+                            SoundEvents.WIND_CHARGE_THROW, SoundSource.PLAYERS, 1.0f, 1.0f);
+                }
+                case "wither_skull" -> {
+                    WitherSkull skull = new WitherSkull(serverLevel, player, lookVec.normalize());
+                    skull.setPos(eyePos.x + lookVec.x * 1.5, eyePos.y + lookVec.y * 1.5, eyePos.z + lookVec.z * 1.5);
+                    serverLevel.addFreshEntity(skull);
+                    level.playSound(null, player.getX(), player.getY(), player.getZ(),
+                            SoundEvents.WITHER_SHOOT, SoundSource.PLAYERS, 1.0f, 1.0f);
+                }
+                case "dragon_fireball" -> {
+                    DragonFireball dragonFireball = new DragonFireball(serverLevel, player, lookVec.normalize());
+                    dragonFireball.setPos(eyePos.x + lookVec.x * 1.5, eyePos.y + lookVec.y * 1.5, eyePos.z + lookVec.z * 1.5);
+                    serverLevel.addFreshEntity(dragonFireball);
+                }
                 case "fireball" -> {
                     LargeFireball fireball = new LargeFireball(serverLevel, player, lookVec.normalize(), (int) (explosionPower > 0 ? explosionPower : 2));
                     fireball.setPos(eyePos.x + lookVec.x * 1.5, eyePos.y + lookVec.y * 1.5, eyePos.z + lookVec.z * 1.5);
@@ -146,11 +178,24 @@ public class DynamicGunItem extends Item {
         CustomData customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
         CompoundTag tag = customData.copyTag();
 
+        if (tag.contains("projectile_type")) {
+            String pType = tag.getString("projectile_type");
+            String displayType = switch (pType.toLowerCase()) {
+                case "tnt", "primed_tnt" -> "§c🧨 点燃的 TNT 实体炸药";
+                case "wind_charge" -> "§f🌪 旋风弹 (Wind Charge)";
+                case "wither_skull" -> "§8💀 凋灵之首 (Wither Skull)";
+                case "dragon_fireball" -> "§5🐉 龙息火球 (Dragon Fireball)";
+                case "fireball" -> "§6🔥 恶魂火球 (Large Fireball)";
+                case "small_fireball" -> "§e⚡ 烈焰火焰弹 (Small Fireball)";
+                case "arrow" -> "§7🏹 强化箭矢 (Arrow)";
+                case "snowball" -> "§f❄ 冰雪弹 (Snowball)";
+                default -> "§b🎯 瞬发穿透激光 (Raycast Bullet)";
+            };
+            tooltipComponents.add(Component.literal("§e⚡ 弹药类型: " + displayType));
+        }
+
         if (tag.contains("damage")) {
             tooltipComponents.add(Component.literal("§c⚔ 伤害: §f" + tag.getFloat("damage")));
-        }
-        if (tag.contains("projectile_type")) {
-            tooltipComponents.add(Component.literal("§e⚡ 弹药类型: §f" + tag.getString("projectile_type")));
         }
         if (tag.contains("cooldown")) {
             tooltipComponents.add(Component.literal("§9⏱ 射击间隔: §f" + tag.getInt("cooldown") + " ticks"));

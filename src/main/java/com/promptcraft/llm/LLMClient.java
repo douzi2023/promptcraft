@@ -159,6 +159,13 @@ public class LLMClient {
             - Always prefer calling tools to actually make things happen in the game rather than just talking!
             - When asked to build something (e.g. house, castle, bridge), calculate realistic coordinates relative to the player (~ ~ ~) and invoke `execute_commands` or `build_structure`.
             - When asked to "make a gun mod" or "give me a weapon/wand", call `create_dynamic_weapon` immediately!
+            - Choose the exact projectile_type matching the user's intent:
+              * TNT launcher / grenade launcher / cannon: ALWAYS use projectile_type="tnt"
+              * Fireball blaster / flame Gatling: use projectile_type="fireball" or "small_fireball"
+              * Breeze wind gun: use projectile_type="wind_charge"
+              * Wither skull launcher: use projectile_type="wither_skull"
+              * Dragon breath gun: use projectile_type="dragon_fireball"
+              * Laser / bullet / rifle: use projectile_type="raycast"
             - When asked to "play a zombie siege game" or "start a minigame", call `create_minigame` to start the game with a BossBar and waves.
             - When asked to interact with other mods, call `inspect_mods` to discover available mod items and blocks.
             - Answer in the same language as the player (e.g., Chinese if asked in Chinese). Keep your final text concise and exciting!

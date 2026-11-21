@@ -55,10 +55,10 @@ public class ToolRegistry {
                 "create_dynamic_weapon",
                 "Manufacture a custom dynamic weapon (gun or magic wand) with custom stats and projectile effects, putting it immediately into the player's hands.",
                 new JsonObjectBuilder()
-                        .addStringProperty("weapon_type", "Type of weapon: 'gun' (shoots bullets/fireballs/arrows) or 'wand' (casts spells like lightning/freeze/explosion/levitate)", true)
-                        .addStringProperty("name", "Display name of the weapon, e.g. '§6烈焰火球加特林'", true)
+                        .addStringProperty("weapon_type", "Type of weapon: 'gun' (shoots bullets/tnt/fireballs/arrows) or 'wand' (casts spells like lightning/freeze/explosion/levitate)", true)
+                        .addStringProperty("name", "Display name of the weapon, e.g. '§6烈焰火球加特林' or '§cTNT发射炮'", true)
                         .addArrayProperty("lore", "string", "List of lore/description lines for the weapon tooltip", false)
-                        .addStringProperty("projectile_type", "For gun: 'raycast' (bullet), 'fireball', 'small_fireball', 'arrow', 'snowball'", false)
+                        .addStringProperty("projectile_type", "For gun: 'tnt' (shoots actual primed TNT blocks!), 'fireball' (large ghast fireball), 'small_fireball' (blaze), 'wind_charge' (breeze blast), 'wither_skull', 'dragon_fireball', 'arrow', 'snowball', 'raycast' (instant laser)", false)
                         .addStringProperty("spell_type", "For wand: 'lightning', 'freeze', 'levitate', 'heal', 'explosion'", false)
                         .addNumberProperty("damage", "Attack damage for the weapon", false)
                         .addNumberProperty("power", "Spell power or explosion power", false)
@@ -231,12 +231,16 @@ public class ToolRegistry {
             stack.set(DataComponents.LORE, new ItemLore(loreLines));
         }
 
-        // Give to player
-        if (player.getMainHandItem().isEmpty()) {
-            player.setItemInHand(player.getUsedItemHand(), stack);
-        } else {
-            player.getInventory().add(stack);
+        // Add enchantment glint to distinguish custom created weapons
+        stack.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
+
+        // Equip directly to player's main hand (safely move old item to inventory)
+        ItemStack oldMainHand = player.getMainHandItem();
+        if (!oldMainHand.isEmpty()) {
+            player.getInventory().add(oldMainHand.copy());
         }
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
+        player.sendSystemMessage(Component.literal("§a[PromptCraft] 已将特制武器 §e" + name + " §a直接装备到你的主手！（原手持物品已收纳至背包）"));
 
         // Play feedback sound and particle
         ServerLevel level = player.serverLevel();
