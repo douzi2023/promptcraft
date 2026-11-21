@@ -1,36 +1,28 @@
 {
 	"schemaVersion": 1,
-	"id": "modid",
+	"id": "promptcraft",
 	"version": "${version}",
-	"name": "Example Mod",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"name": "PromptCraft",
+	"description": "In-game LLM agent for dynamic commands, procedural dynamic items/guns, minigames, and mod interoperability.",
 	"authors": [
-		"Me!"
+		"PromptCraft Team"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://github.com/promptcraft/promptcraft"
 	},
-	"license": "CC0-1.0",
-	"icon": "assets/modid/icon.png",
+	"license": "MIT",
+	"icon": "assets/promptcraft/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"com.example.ExampleMod"
+			"com.promptcraft.PromptCraft"
 		],
 		"client": [
-			"com.example.client.ExampleModClient"
+			"com.promptcraft.client.PromptCraftClient"
 		]
 	},
-	"mixins": [
-		"modid.mixins.json",
-		{
-			"config": "modid.client.mixins.json",
-			"environment": "client"
-		}
-	],
 	"depends": {
-		"fabricloader": ">=0.20.1",
+		"fabricloader": ">=0.16.9",
 		"minecraft": "~1.21.1",
 		"java": ">=21",
 		"fabric-api": "*"

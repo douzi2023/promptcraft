@@ -1,5 +1,5 @@
 plugins {
-	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	id 'fabric-loom' version "${loom_version}"
 	id 'maven-publish'
 }
 
@@ -12,12 +12,9 @@ repositories {
 }
 
 loom {
-	splitEnvironmentSourceSets()
-
 	mods {
-		"modid" {
+		"promptcraft" {
 			sourceSet sourceSets.main
-			sourceSet sourceSets.client
 		}
 	}
 }
@@ -56,11 +53,15 @@ java {
 }
 
 jar {
-	def projectName = project.name
-	inputs.property "projectName", projectName
-
 	from("LICENSE") {
-		rename { "${it}_$projectName"}
+		rename { "${it}_promptcraft" }
+	}
+}
+
+remapJar {
+	doLast {
+		println "remapJar input: ${inputFile.get().asFile.absolutePath} (${inputFile.get().asFile.length()} bytes)"
+		println "remapJar output: ${archiveFile.get().asFile.absolutePath} (${archiveFile.get().asFile.length()} bytes)"
 	}
 }
 
