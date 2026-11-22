@@ -2,6 +2,7 @@ package com.promptcraft;
 
 import com.promptcraft.command.PromptCraftCommand;
 import com.promptcraft.config.PromptCraftConfig;
+import com.promptcraft.entity.ModEntities;
 import com.promptcraft.item.ModItems;
 import com.promptcraft.minigame.MinigameManager;
 import net.fabricmc.api.ModInitializer;
@@ -22,8 +23,9 @@ public class PromptCraft implements ModInitializer {
         // 1. Load Configuration
         PromptCraftConfig.load();
 
-        // 2. Register Dynamic Items
+        // 2. Register Dynamic Items & Custom Entities
         ModItems.register();
+        ModEntities.register();
 
         // 3. Register Commands (/ai ...)
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {

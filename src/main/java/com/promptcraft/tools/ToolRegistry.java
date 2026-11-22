@@ -5,6 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.promptcraft.config.PromptCraftConfig;
+import com.promptcraft.entity.DynamicCreatureEntity;
+import com.promptcraft.entity.ModEntities;
 import com.promptcraft.item.ModItems;
 import com.promptcraft.minigame.ActiveMinigame;
 import com.promptcraft.minigame.MinigameManager;
@@ -22,7 +24,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemLore;
@@ -93,6 +97,27 @@ public class ToolRegistry {
                         .build()
         ));
 
+        // 6. create_custom_creature
+        tools.add(createTool(
+                "create_custom_creature",
+                "Create and spawn a fully custom dynamic puppet creature with arbitrary scale, health, combat styles (melee, ranged laser, fireball, TNT barrage, kamikaze bomber, healer), auras, skins, and equipment.",
+                new JsonObjectBuilder()
+                        .addStringProperty("name", "Display name of the creature (e.g. '§6地狱泰坦巨人' or '§a守护天使')", true)
+                        .addNumberProperty("scale", "Physical size scale of the entity from 0.2 to 10.0 (e.g. 0.5 for dwarf/pet, 1.0 normal, 3.5 for giant boss). Changes hitbox, reach, and model natively!", false)
+                        .addNumberProperty("max_health", "Maximum health points (default 60.0)", false)
+                        .addNumberProperty("attack_damage", "Base attack damage (default 10.0)", false)
+                        .addNumberProperty("movement_speed", "Movement speed (0.1 slow to 0.6 very fast, default 0.32)", false)
+                        .addStringProperty("combat_style", "Combat AI behavior: 'melee' (close combat), 'ranged_laser' (fires raycast beams), 'ranged_fireball' (shoots fireballs), 'ranged_tnt' (hurls primed TNT explosives), 'kamikaze_bomber' (charges at targets and self-destructs), 'healer_support' (follows owner and casts healing auras), 'guardian' (defends player)", false)
+                        .addBooleanProperty("is_friendly", "Whether the creature is a friendly companion protecting the player (true) or an enemy monster attacking the player (false)", false)
+                        .addStringProperty("skin_type", "Base model skin texture: 'zombie', 'skeleton', 'wither_skeleton', 'piglin', 'iron_golem', 'enderman', 'steve'", false)
+                        .addStringProperty("particle", "Particle aura around creature: 'flame', 'soul_fire', 'portal', 'dragon_breath', 'enchant', 'heart', 'smoke'", false)
+                        .addStringProperty("head_block", "Block or helmet equipped on head, e.g. 'minecraft:carved_pumpkin', 'minecraft:diamond_helmet', 'minecraft:tnt', 'minecraft:dragon_head'", false)
+                        .addStringProperty("main_hand_item", "Weapon or item held in main hand, e.g. 'minecraft:netherite_sword', 'minecraft:blaze_rod', 'minecraft:bow'", false)
+                        .addArrayProperty("skills", "string", "Special skill tags: 'teleport_on_hurt' (teleports when struck), 'summon_minions' (spawns wolves/zombies), 'death_explosion' (explodes on dying), 'regeneration' (heals over time)", false)
+                        .addNumberProperty("spawn_count", "Number of creatures to summon (1 to 10, default 1)", false)
+                        .build()
+        ));
+
         return tools;
     }
 
@@ -107,6 +132,7 @@ public class ToolRegistry {
                 case "create_minigame" -> createMinigame(player, args);
                 case "inspect_surroundings" -> inspectSurroundings(player);
                 case "inspect_mods" -> inspectMods(args);
+                case "create_custom_creature" -> createCustomCreature(player, args);
                 default -> "Unknown tool: " + toolName;
             };
         } catch (Exception e) {
@@ -342,6 +368,99 @@ public class ToolRegistry {
         return "Found " + matches.size() + " matching registered items:\n" + String.join(", ", matches);
     }
 
+    private static String createCustomCreature(ServerPlayer player, JsonObject args) {
+        ServerLevel level = player.serverLevel();
+        String name = args.has("name") ? args.get("name").getAsString() : "§b神秘创造生物";
+        double scale = args.has("scale") ? Math.max(0.2, Math.min(10.0, args.get("scale").getAsDouble())) : 1.0;
+        double maxHealth = args.has("max_health") ? Math.max(1.0, args.get("max_health").getAsDouble()) : 60.0;
+        double attackDamage = args.has("attack_damage") ? Math.max(0.0, args.get("attack_damage").getAsDouble()) : 10.0;
+        double speed = args.has("movement_speed") ? Math.max(0.05, Math.min(1.0, args.get("movement_speed").getAsDouble())) : 0.32;
+        String combatStyle = args.has("combat_style") ? args.get("combat_style").getAsString() : "melee";
+        boolean isFriendly = args.has("is_friendly") && args.get("is_friendly").getAsBoolean();
+        String skinType = args.has("skin_type") ? args.get("skin_type").getAsString() : "zombie";
+        String particle = args.has("particle") ? args.get("particle").getAsString() : "flame";
+        String headItem = args.has("head_block") ? args.get("head_block").getAsString() : "";
+        String mainHandItem = args.has("main_hand_item") ? args.get("main_hand_item").getAsString() : "";
+        int count = args.has("spawn_count") ? Math.max(1, Math.min(10, args.get("spawn_count").getAsInt())) : 1;
+
+        List<String> skillsList = new ArrayList<>();
+        if (args.has("skills") && args.get("skills").isJsonArray()) {
+            for (JsonElement e : args.getAsJsonArray("skills")) {
+                skillsList.add(e.getAsString().toLowerCase());
+            }
+        }
+
+        Vec3 look = player.getLookAngle();
+        double spawnX = player.getX() + look.x * 3.0;
+        double spawnY = player.getY();
+        double spawnZ = player.getZ() + look.z * 3.0;
+
+        for (int i = 0; i < count; i++) {
+            DynamicCreatureEntity entity = new DynamicCreatureEntity(ModEntities.DYNAMIC_CREATURE, level);
+            double offsetX = (count > 1) ? (player.getRandom().nextDouble() - 0.5) * 4.0 : 0.0;
+            double offsetZ = (count > 1) ? (player.getRandom().nextDouble() - 0.5) * 4.0 : 0.0;
+            entity.moveTo(spawnX + offsetX, spawnY, spawnZ + offsetZ, player.getYRot() + 180.0f, 0.0f);
+
+            entity.setCustomName(Component.literal(name));
+            entity.setCustomNameVisible(true);
+
+            // Attributes
+            var scaleAttr = entity.getAttribute(Attributes.SCALE);
+            if (scaleAttr != null) scaleAttr.setBaseValue(scale);
+
+            var healthAttr = entity.getAttribute(Attributes.MAX_HEALTH);
+            if (healthAttr != null) {
+                healthAttr.setBaseValue(maxHealth);
+                entity.setHealth((float) maxHealth);
+            }
+
+            var dmgAttr = entity.getAttribute(Attributes.ATTACK_DAMAGE);
+            if (dmgAttr != null) dmgAttr.setBaseValue(attackDamage);
+
+            var spdAttr = entity.getAttribute(Attributes.MOVEMENT_SPEED);
+            if (spdAttr != null) spdAttr.setBaseValue(speed);
+
+            // Behavior & Aesthetics
+            entity.setCombatStyle(combatStyle);
+            entity.setFriendly(isFriendly);
+            if (isFriendly) {
+                entity.setOwnerUuid(player.getUUID());
+            }
+            entity.setSkinType(skinType);
+            entity.setParticleType(particle);
+
+            for (String s : skillsList) {
+                entity.addSkill(s);
+            }
+
+            // Equip items
+            if (!headItem.isEmpty()) {
+                BuiltInRegistries.ITEM.getOptional(ResourceLocation.tryParse(headItem)).ifPresent(item -> {
+                    entity.setItemSlot(EquipmentSlot.HEAD, new ItemStack(item));
+                });
+            }
+            if (!mainHandItem.isEmpty()) {
+                BuiltInRegistries.ITEM.getOptional(ResourceLocation.tryParse(mainHandItem)).ifPresent(item -> {
+                    entity.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(item));
+                });
+            }
+
+            level.addFreshEntity(entity);
+
+            // Spawn visual effect
+            level.sendParticles(ParticleTypes.EXPLOSION, entity.getX(), entity.getY() + 1.0, entity.getZ(), 3, 0.5, 0.5, 0.5, 0.0);
+            level.playSound(null, entity.getX(), entity.getY(), entity.getZ(), SoundEvents.ZOMBIE_VILLAGER_CONVERTED, SoundSource.PLAYERS, 1.0f, 1.2f);
+        }
+
+        player.sendSystemMessage(Component.literal(String.format(
+                "§a[PromptCraft] §f已成功召唤出 %d 只自定义生物: §e%s §7(体型: %.1fx, 生命: %.0f, 攻击: %.0f, 风格: %s, 阵营: %s)",
+                count, name, scale, maxHealth, attackDamage, combatStyle, isFriendly ? "友好卫士" : "敌对怪物"
+        )));
+
+        return String.format("Successfully spawned %d custom creature(s) named '%s' [Scale: %.1f, Health: %.0f, Combat: %s, Friendly: %b]",
+                count, name, scale, maxHealth, combatStyle, isFriendly);
+    }
+
     private static JsonObject createTool(String name, String description, JsonObject parameters) {
         JsonObject tool = new JsonObject();
         tool.addProperty("type", "function");
@@ -369,6 +488,15 @@ public class ToolRegistry {
         public JsonObjectBuilder addNumberProperty(String name, String description, boolean isRequired) {
             JsonObject prop = new JsonObject();
             prop.addProperty("type", "number");
+            prop.addProperty("description", description);
+            properties.add(name, prop);
+            if (isRequired) required.add(name);
+            return this;
+        }
+
+        public JsonObjectBuilder addBooleanProperty(String name, String description, boolean isRequired) {
+            JsonObject prop = new JsonObject();
+            prop.addProperty("type", "boolean");
             prop.addProperty("description", description);
             properties.add(name, prop);
             if (isRequired) required.add(name);

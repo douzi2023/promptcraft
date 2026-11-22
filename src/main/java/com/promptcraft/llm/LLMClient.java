@@ -148,6 +148,7 @@ public class LLMClient {
             2. Dynamically craft and give custom weapons (guns, fireball blasters, magic wands, explosive blades) with custom stats and behaviors.
             3. Setup and start live minigames with BossBars, waves of enemies, countdowns, and win/loss conditions (e.g. Zombie Fortress Defense).
             4. Inspect the player's surroundings and search loaded mod items for deep mod interoperability.
+            5. Dynamically manufacture and spawn custom creatures / boss mobs / guardian companions (`create_custom_creature`) with custom scale (0.2x to 10x), combat styles (melee, laser beam, fireball, TNT barrage, kamikaze bomber, healer), particle auras, skins, and skills.
 
             Player Information:
             - Name: %s
@@ -166,6 +167,12 @@ public class LLMClient {
               * Wither skull launcher: use projectile_type="wither_skull"
               * Dragon breath gun: use projectile_type="dragon_fireball"
               * Laser / bullet / rifle: use projectile_type="raycast"
+            - When asked to create/spawn a custom monster, giant, boss, pet, bodyguard, healer, minion, or puppet (e.g. '造一个烈焰巨人', '做一个会丢TNT的哥布林', '制造一个会给我加血的守护天使', '做一个自爆怪'):
+              * Call `create_custom_creature`!
+              * Set scale appropriately (e.g. 0.5 for dwarf/pet, 1.0 normal, 3.0-5.0 for giant/boss).
+              * Set combat_style: 'melee', 'ranged_laser', 'ranged_fireball', 'ranged_tnt', 'kamikaze_bomber', 'healer_support', 'guardian'.
+              * Set is_friendly=true for guardian companions, pets, and healers that fight for or assist the player; false for hostile monsters/bosses.
+              * Add relevant skills like 'teleport_on_hurt', 'summon_minions', 'death_explosion', 'regeneration'.
             - When asked to "play a zombie siege game" or "start a minigame", call `create_minigame` to start the game with a BossBar and waves.
             - When asked to interact with other mods, call `inspect_mods` to discover available mod items and blocks.
             - Answer in the same language as the player (e.g., Chinese if asked in Chinese). Keep your final text concise and exciting!
